@@ -75,7 +75,7 @@ public class EnderEyeItemLogic {
 							pair.getSecond().value().getClass().getSimpleName()
 						);
 						try {
-							eyeOfEnder.signalTo(pair.getFirst());
+							eyeOfEnder.signalTo(pair.getFirst().getCenter());
 						} catch (Throwable t) {
 							ALConstants.logError(t, "Failed to signal EyeOfEnder to position {}", pair.getFirst());
 						}
@@ -136,7 +136,7 @@ public class EnderEyeItemLogic {
 			if (pos != null) {
 				ALConstants.logInfo("Location found - updating eye of ender entity");
 				try {
-					eyeOfEnder.signalTo(pos);
+					eyeOfEnder.signalTo(pos.getCenter());
 				} catch (Throwable t2) {
 					ALConstants.logError(t2, "Failed to signal EyeOfEnder to position {}", pos);
 				}

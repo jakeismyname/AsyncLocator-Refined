@@ -3,21 +3,14 @@ package brightspark.asynclocator.mixins;
 import brightspark.asynclocator.ALConstants;
 import brightspark.asynclocator.logic.MerchantLogic;
 import brightspark.asynclocator.platform.Services;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.npc.AbstractVillager;
-import net.minecraft.world.entity.npc.VillagerTrades;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.saveddata.maps.MapDecorationType;
+
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -59,7 +52,7 @@ public abstract class TreasureMapForEmeraldsMixin {
 		),
 		cancellable = true
 	)
-	public void updateMapAsyncInject(
+	private void updateMapAsyncInject(
 		Entity pTrader,
 		RandomSource pRandom,
 		CallbackInfoReturnable<MerchantOffer> cir

@@ -54,6 +54,10 @@ subprojects {
         it.options.release = 21
     }
 
+    dependencies {
+        implementation(annotationProcessor("io.github.llamalad7:mixinextras-fabric:${project.mixinextras_version}"))
+    }
+
     processResources {
         def propsProvider = providers.provider { project.properties }
         filesMatching(['pack.mcmeta', 'fabric.mod.json', 'neoforge.mods.toml', '*.mixins.json']) {

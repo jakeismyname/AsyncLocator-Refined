@@ -12,13 +12,12 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.npc.AbstractVillager;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.MapItem;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.saveddata.maps.MapDecorationType;
 import net.minecraft.world.level.saveddata.maps.MapId;
@@ -27,13 +26,16 @@ import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.functions.ExplorationMapFunction;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
@@ -87,7 +89,7 @@ public abstract class ExplorationMapFunctionMixin {
 			: null;
 		if (entity instanceof AbstractVillager merchant) {
 			if (merchant.getTradingPlayer() instanceof ServerPlayer tradingPlayer) {
-				int villagerLevel = merchant instanceof Villager villager ? villager.getVillagerData().getLevel() : 1;
+				int villagerLevel = merchant instanceof Villager villager ? villager.getVillagerData().level() : 1;
 				tradingPlayer.sendMerchantOffers(
 					tradingPlayer.containerMenu.containerId,
 					merchant.getOffers(),
@@ -101,24 +103,22 @@ public abstract class ExplorationMapFunctionMixin {
 		}
 	}
 
-	@Redirect(
+	@WrapOperation(
 		method = "run(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/level/storage/loot/LootContext;)Lnet/minecraft/world/item/ItemStack;",
 		at = @At(
 			value = "INVOKE",
-			target = "Lnet/minecraft/world/item/MapItem;create(Lnet/minecraft/world/level/Level;IIBZZ)Lnet/minecraft/world/item/ItemStack;"
+			target = "Lnet/minecraft/world/item/MapItem;create(Lnet/minecraft/server/level/ServerLevel;IIBZZ)Lnet/minecraft/world/item/ItemStack;"
 		)
 	)
 	private ItemStack redirectMapItemCreate(
-		Level level, int x, int z, byte scale, boolean trackingPosition, boolean unlimitedTracking,
-		ItemStack originalStack_usedByRun, LootContext context_usedByRun
+		ServerLevel level, int x, int z, byte scale, boolean trackingPosition, boolean unlimitedTracking,
+		Operation<ItemStack> original, @Local(argsOnly = true) LootContext lootContext
 	) {
-		LootContext context = context_usedByRun;
-
 		if (!Services.CONFIG.explorationMapEnabled() || !(level instanceof ServerLevel serverLevel)) {
-			return MapItem.create(level, x, z, scale, trackingPosition, unlimitedTracking);
+			return original.call(level, x, z, scale, trackingPosition, unlimitedTracking);
 		}
 
-		Optional<Holder<MapDecorationType>> mapDecorationHolderOpt = getDecorationHolderFromKey(context);
+		Optional<Holder<MapDecorationType>> mapDecorationHolderOpt = getDecorationHolderFromKey(lootContext);
 		if (mapDecorationHolderOpt.isEmpty()) {
 			ALConstants.logError("ExplorationMap Redirect: Couldn't get MapDecorationType Holder for key {}, falling back to vanilla map creation.", this.asyncLocator$decorationTypeKey);
 			return MapItem.create(level, x, z, scale, trackingPosition, unlimitedTracking);
@@ -126,8 +126,8 @@ public abstract class ExplorationMapFunctionMixin {
 
 		ALConstants.logDebug("Redirecting MapItem.create for async locator exploration map {}.", destination.location());
 
-		BlockPos originPos = context.hasParameter(LootContextParams.ORIGIN)
-			? BlockPos.containing(context.getParameter(LootContextParams.ORIGIN))
+		BlockPos originPos = lootContext.hasParameter(LootContextParams.ORIGIN)
+			? BlockPos.containing(lootContext.getParameter(LootContextParams.ORIGIN))
 			: BlockPos.containing(x, level.getHeight() / 2, z);
 
 		MapItemSavedData mapData = MapItemSavedData.createFresh(
@@ -150,14 +150,14 @@ public abstract class ExplorationMapFunctionMixin {
 		AsyncLocator.locate(serverLevel, destination, originPos, searchRadius, skipKnownStructures)
 			.thenOnServerThread(foundPos -> {
 				Component mapName = ExplorationMapFunctionLogic.getCachedName(pendingMapStack);
-				BlockPos inventoryPos = context.hasParameter(LootContextParams.ORIGIN)
-					? BlockPos.containing(context.getParameter(LootContextParams.ORIGIN))
+				BlockPos inventoryPos = lootContext.hasParameter(LootContextParams.ORIGIN)
+					? BlockPos.containing(lootContext.getParameter(LootContextParams.ORIGIN))
 					: null;
 
 		// First, try to update merchant offer result directly
 		boolean merchantUpdated = false;
-			var thisEntity = context.hasParameter(LootContextParams.THIS_ENTITY)
-				? context.getParameter(LootContextParams.THIS_ENTITY)
+			var thisEntity = lootContext.hasParameter(LootContextParams.THIS_ENTITY)
+				? lootContext.getParameter(LootContextParams.THIS_ENTITY)
 				: null;
 			if (thisEntity instanceof AbstractVillager merchant) {
 				UUID targetId = CommonLogic.getTrackingUUID(pendingMapStack);
@@ -178,7 +178,7 @@ public abstract class ExplorationMapFunctionMixin {
 						}
 					}
 				} else {
-					ALConstants.logWarn("Managed map lacks tracking UUID in trade context: cannot match offer result");
+					ALConstants.logWarn("Managed map lacks tracking UUID in trade lootContext: cannot match offer result");
 				}
 			}
 
@@ -205,7 +205,7 @@ public abstract class ExplorationMapFunctionMixin {
                     }
 				}
 			}
-				asyncLocator$refreshMerchantUIIfApplicable(context);
+				asyncLocator$refreshMerchantUIIfApplicable(lootContext);
 			});
 
 		return pendingMapStack;

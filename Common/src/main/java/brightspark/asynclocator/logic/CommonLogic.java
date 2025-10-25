@@ -73,23 +73,14 @@ public class CommonLogic {
 			return false;
 		}
 		if (stack.has(ALDataComponents.LOCATING)) return true;
-		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
-		if (customData == null) return false;
+		CompoundTag customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 		return customData.contains(PENDING_MARKER) || customData.contains(UUID_TRACKER);
 	}
 
 	// Retrieves the tracking UUID stoerd on a managed pending map
 	public static @Nullable java.util.UUID getTrackingUUID(ItemStack stack) {
-		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
-		if (customData == null) return null;
-		CompoundTag tag = customData.copyTag();
-		String raw = tag.getString(UUID_TRACKER).orElse("");
-		if (raw.isEmpty()) return null;
-		try {
-			return java.util.UUID.fromString(raw);
-		} catch (IllegalArgumentException ex) {
-			return null;
-		}
+			return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
+				.getString(UUID_TRACKER).map(java.util.UUID::fromString).orElse(null);
 	}
 
 	public static void clearPendingState(ItemStack mapStack) {

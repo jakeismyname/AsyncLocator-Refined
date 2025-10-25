@@ -18,10 +18,11 @@
 		"main": ["brightspark.asynclocator.AsyncLocatorModFabric"]
 	},
 	"mixins": ["asynclocator.mixins.json"],
+	"accessWidener": "asynclocator.accesswidener",
 	"depends": {
-		"fabricloader": ">=0.17.0",
-		"fabric-api": ">=0.119.2+1.21.4",
-		"minecraft": "1.21.4",
+		"fabricloader": ">=0.17.3",
+		"fabric-api": "*",
+		"minecraft": "1.21.10",
 		"java": ">=21"
 	}
 }
