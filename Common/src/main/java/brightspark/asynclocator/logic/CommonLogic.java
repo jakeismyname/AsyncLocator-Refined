@@ -1,13 +1,12 @@
 package brightspark.asynclocator.logic;
 
-import brightspark.asynclocator.ALDataComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Unit;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.item.ItemStack;
@@ -22,30 +21,48 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public class CommonLogic {
 	private static final String MAP_HOVER_NAME_KEY = "menu.working";
+	private static final String LOCATING_STATUS = "asynclocator.locating";
 	private static final String PENDING_MARKER = "asynclocator.pending";
 	private static final String UUID_TRACKER = PENDING_MARKER + ".uuid";
 
 	private CommonLogic() {}
 
+	public static void updateCustomData(ItemStack stack, Consumer<CompoundTag> modifier) {
+		stack.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, customData -> customData.update(modifier));
+	}
+
+	public static void setLocating(ItemStack stack, boolean isLocating) {
+		updateCustomData(stack, tag -> tag.putBoolean(LOCATING_STATUS, isLocating));
+	}
+
+	public static boolean isLocating(ItemStack stack) {
+		return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getBooleanOr(LOCATING_STATUS, false);
+	}
+
 	// Creates an empty "Filled Map", marks it as locating, and gives it a temporary name
 	public static ItemStack createEmptyMap() {
 		ItemStack stack = new ItemStack(Items.FILLED_MAP);
-		stack.set(DataComponents.ITEM_NAME, Component.translatable(MAP_HOVER_NAME_KEY));
-		CompoundTag customData = new CompoundTag();
-		customData.putByte(PENDING_MARKER, (byte) 1);
-		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(customData));
+		DataComponentPatch.Builder patch = DataComponentPatch.builder();
+		patch.set(DataComponents.ITEM_NAME, Component.translatable(MAP_HOVER_NAME_KEY));
+		CompoundTag tag = new CompoundTag();
+		tag.putByte(PENDING_MARKER, (byte) 1);
+		patch.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+		stack.applyComponents(patch.build());
 		return stack;
 	}
 
 	public static ItemStack createManagedMap() {
 		ItemStack stack = new ItemStack(Items.FILLED_MAP);
-		stack.set(DataComponents.ITEM_NAME, Component.translatable(MAP_HOVER_NAME_KEY));
-		CompoundTag customData = new CompoundTag();
-		customData.putString(UUID_TRACKER, UUID.randomUUID().toString());
-		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(customData));
+		DataComponentPatch.Builder patch = DataComponentPatch.builder();
+		patch.set(DataComponents.ITEM_NAME, Component.translatable(MAP_HOVER_NAME_KEY));
+		CompoundTag tag = new CompoundTag();
+		tag.putString(UUID_TRACKER, UUID.randomUUID().toString());
+		patch.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+		stack.applyComponents(patch.build());
 		return stack;
 	}
 
@@ -62,7 +79,7 @@ public class CommonLogic {
 		level.setMapData(newMapId, mapData);
 		
 		stack.set(DataComponents.ITEM_NAME, Component.translatable(MAP_HOVER_NAME_KEY));
-		stack.set(ALDataComponents.LOCATING, Unit.INSTANCE);
+		setLocating(stack, true);
 		
 		return stack;
 	}
@@ -72,31 +89,23 @@ public class CommonLogic {
 		if (!stack.is(Items.FILLED_MAP)) {
 			return false;
 		}
-		if (stack.has(ALDataComponents.LOCATING)) return true;
+		if (isLocating(stack)) return true;
 		CompoundTag customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 		return customData.contains(PENDING_MARKER) || customData.contains(UUID_TRACKER);
 	}
 
 	// Retrieves the tracking UUID stoerd on a managed pending map
 	public static @Nullable java.util.UUID getTrackingUUID(ItemStack stack) {
-			return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
+		return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
 				.getString(UUID_TRACKER).map(java.util.UUID::fromString).orElse(null);
 	}
 
 	public static void clearPendingState(ItemStack mapStack) {
-		mapStack.remove(ALDataComponents.LOCATING);
-		
-	CustomData currentData = mapStack.get(DataComponents.CUSTOM_DATA);
-		if (currentData != null) {
-			CompoundTag newTag = currentData.copyTag();
-			newTag.remove(PENDING_MARKER);
-			newTag.remove(UUID_TRACKER);
-			if (newTag.isEmpty()) {
-				mapStack.remove(DataComponents.CUSTOM_DATA);
-			} else {
-				mapStack.set(DataComponents.CUSTOM_DATA, CustomData.of(newTag));
-			}
-		}
+		updateCustomData(mapStack, tag -> {
+			tag.remove(PENDING_MARKER);
+			tag.remove(UUID_TRACKER);
+			tag.remove(LOCATING_STATUS);
+		});
 	}
 	
 	// Updates the data of the map

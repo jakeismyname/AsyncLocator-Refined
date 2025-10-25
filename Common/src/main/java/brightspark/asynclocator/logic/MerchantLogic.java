@@ -25,13 +25,15 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
+import static brightspark.asynclocator.logic.CommonLogic.setLocating;
+
 public class MerchantLogic {
 	private MerchantLogic() {}
 
 
 	public static void invalidateMap(AbstractVillager merchant, ItemStack mapStack) {
 		mapStack.set(DataComponents.ITEM_NAME, Component.translatable("item.minecraft.map"));
-		mapStack.remove(brightspark.asynclocator.ALDataComponents.LOCATING);
+		setLocating(mapStack, false);
 
 		merchant.getOffers()
 			.stream()
